@@ -32,12 +32,13 @@ h1, h2, h3 {
 # =========================
 @st.cache_resource
 def connect():
-    creds = Credentials.from_service_account_info(st.secrets["google"])
-        scopes=[
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ]
-    )
+   creds = Credentials.from_service_account_info(
+    st.secrets["google"],
+    scopes=[
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+)
     client = gspread.authorize(creds)
     sheet = client.open_by_key("1Y_BD6eCM_jt-FzwNjVrocPmRGr104pQcY1qoPPN2pnE")
 
