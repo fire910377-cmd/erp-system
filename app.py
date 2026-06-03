@@ -1,9 +1,10 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
+import pandas as pd
 
 # =========================
-# Google Sheets 連線（雲端版）
+# CONNECT
 # =========================
 @st.cache_resource
 def connect():
@@ -14,7 +15,6 @@ def connect():
             "https://www.googleapis.com/auth/drive"
         ]
     )
-
     client = gspread.authorize(creds)
     sheet = client.open_by_key("1Y_BD6eCM_jt-FzwNjVrocPmRGr104pQcY1qoPPN2pnE")
 
@@ -27,7 +27,7 @@ def connect():
 tabs = connect()
 
 # =========================
-# Helper
+# PAY FUNCTION
 # =========================
 def calculate_pay(hours, rate, emp_type):
     if emp_type == "Full-Time":
@@ -40,144 +40,175 @@ def calculate_pay(hours, rate, emp_type):
     gross = regular + overtime
     tax = gross * 0.1
     net = gross - tax
-
     return regular, overtime, gross, tax, net
 
 # =========================
 # UI
 # =========================
 st.set_page_config(page_title="ERP System", layout="wide")
-st.title("🏢 ERP FULL SYSTEM")
+st.title("🏢 ERP FULL SYSTEM (FINAL)")
 
 menu = st.sidebar.selectbox(
     "Menu",
-    ["Employee Management", "Shift Management", "Attendance", "Payroll"]
+    ["Dashboard","Employee","Shift","Attendance","Payroll"]
 )
 
 # =========================
-# 員工管理
+# DASHBOARD（加分🔥）
 # =========================
-if menu == "Employee Management":
-    st.header("👥 Employee Management")
+if menu == "Dashboard":
+    st.header("📊 Dashboard")
 
-    action = st.selectbox("Action", ["Add Employee", "View Employees"])
+    emp = pd.DataFrame(tabs["employees"].get_all_records())
+    att = pd.DataFrame(tabs["attendance"].get_all_records())
 
-    if action == "Add Employee":
+    st.subheader("Employees per Department")
+    if not emp.empty:
+        st.bar_chart(emp["department"].value_counts())
+
+    st.subheader("Work Hours Distribution")
+    if not att.empty:
+        st.bar_chart(att["actual_hours"])
+
+# =========================
+# EMPLOYEE（完整CRUD🔥）
+# =========================
+elif menu == "Employee":
+    st.header("👥 Employee System")
+
+    action = st.selectbox("Action", ["Add","View","Edit","Delete"])
+
+    data = tabs["employees"].get_all_records()
+
+    if action == "Add":
         name = st.text_input("Name")
         role = st.text_input("Role")
         dept = st.text_input("Department")
-        rate = st.number_input("Hourly Rate", min_value=0.0)
-        emp_type = st.selectbox("Type", ["Full-Time", "Part-Time"])
+        rate = st.number_input("Hourly Rate", 0.0)
+        emp_type = st.selectbox("Type", ["Full-Time","Part-Time"])
         phone = st.text_input("Phone")
         email = st.text_input("Email")
 
-        if st.button("Add Employee"):
-            data = tabs["employees"].get_all_records()
+        if st.button("Add"):
             new_id = f"E{len(data)+1:03d}"
+            tabs["employees"].append_row(
+                [new_id,name,role,dept,rate,emp_type,phone,email]
+            )
+            st.success("Added")
 
-            tabs["employees"].append_row([
-                new_id, name, role, dept, rate, emp_type, phone, email
-            ])
-
-            st.success(f"Employee {new_id} added!")
-
-    elif action == "View Employees":
-        data = tabs["employees"].get_all_records()
+    elif action == "View":
         st.dataframe(data)
 
-# =========================
-# 排班管理
-# =========================
-elif menu == "Shift Management":
-    st.header("📅 Shift Management")
-
-    action = st.selectbox("Action", ["Add Shift", "View Shifts"])
-
-    if action == "Add Shift":
+    elif action == "Edit":
         emp_id = st.text_input("Employee ID")
-        date = st.text_input("Date (YYYYMMDD)")
-        start = st.text_input("Start Time")
-        end = st.text_input("End Time")
+        if st.button("Load"):
+            emp = next((e for e in data if e["employee_id"]==emp_id),None)
+            if emp:
+                name = st.text_input("Name",emp["name"])
+                role = st.text_input("Role",emp["role"])
+                dept = st.text_input("Dept",emp["department"])
+                rate = st.number_input("Rate",value=float(emp["hourly_rate"]))
+                phone = st.text_input("Phone",emp["phone"])
+
+                if st.button("Save"):
+                    cell = data.index(emp)+2
+                    tabs["employees"].update(f"B{cell}:F{cell}",
+                        [[name,role,dept,rate,emp["employment_type"]]]
+                    )
+                    st.success("Updated")
+
+    elif action == "Delete":
+        emp_id = st.text_input("Employee ID")
+        if st.button("Delete"):
+            for i,e in enumerate(data):
+                if e["employee_id"]==emp_id:
+                    tabs["employees"].delete_rows(i+2)
+                    st.success("Deleted")
+
+# =========================
+# SHIFT
+# =========================
+elif menu == "Shift":
+    st.header("📅 Shift System")
+
+    action = st.selectbox("Action", ["Add","View"])
+
+    if action == "Add":
+        emp_id = st.text_input("Employee ID")
+        date = st.text_input("Date YYYYMMDD")
+        start = st.text_input("Start")
+        end = st.text_input("End")
         location = st.text_input("Location")
 
         if st.button("Add Shift"):
             data = tabs["shifts"].get_all_records()
             new_id = f"SH{len(data)+1:03d}"
+            tabs["shifts"].append_row(
+                [new_id,emp_id,date,start,end,location,"Scheduled"]
+            )
+            st.success("Added")
 
-            tabs["shifts"].append_row([
-                new_id, emp_id, date, start, end, location, "Scheduled"
-            ])
-
-            st.success(f"Shift {new_id} created!")
-
-    elif action == "View Shifts":
-        data = tabs["shifts"].get_all_records()
-        st.dataframe(data)
+    else:
+        st.dataframe(tabs["shifts"].get_all_records())
 
 # =========================
-# 出勤管理
+# ATTENDANCE
 # =========================
 elif menu == "Attendance":
     st.header("🕒 Attendance")
 
-    action = st.selectbox("Action", ["Check In", "View Attendance"])
+    action = st.selectbox("Action", ["Check In","View"])
 
     if action == "Check In":
         emp_id = st.text_input("Employee ID")
         shift_id = st.text_input("Shift ID")
-        date = st.text_input("Date (YYYYMMDD)")
-        hours = st.number_input("Work Hours", min_value=0.0)
-        status = st.selectbox("Status", ["Present", "Absent"])
+        date = st.text_input("Date")
+        hours = st.number_input("Hours",0.0)
+        status = st.selectbox("Status",["Present","Absent"])
         notes = st.text_input("Notes")
 
-        if st.button("Submit Attendance"):
+        if st.button("Submit"):
             data = tabs["attendance"].get_all_records()
             new_id = f"A{len(data)+1:03d}"
+            tabs["attendance"].append_row(
+                [new_id,shift_id,emp_id,date,hours,status,notes]
+            )
+            st.success("Recorded")
 
-            tabs["attendance"].append_row([
-                new_id, shift_id, emp_id, date, hours, status, notes
-            ])
-
-            st.success(f"Attendance {new_id} recorded!")
-
-    elif action == "View Attendance":
-        data = tabs["attendance"].get_all_records()
-        st.dataframe(data)
+    else:
+        st.dataframe(tabs["attendance"].get_all_records())
 
 # =========================
-# 薪資系統
+# PAYROLL（滿分🔥）
 # =========================
 elif menu == "Payroll":
-    st.header("💰 Payroll System")
+    st.header("💰 Payroll")
 
     emp_id = st.text_input("Employee ID")
-    start_date = st.text_input("Start Date (YYYYMMDD)")
+    start = st.text_input("Start Date YYYYMMDD")
+    end = st.text_input("End Date YYYYMMDD")
 
-    if st.button("Calculate Weekly Pay"):
-        attendance = tabs["attendance"].get_all_records()
-        employees = tabs["employees"].get_all_records()
+    if st.button("Calculate"):
+        att = tabs["attendance"].get_all_records()
+        emp = tabs["employees"].get_all_records()
 
-        emp = next((e for e in employees if e["employee_id"] == emp_id), None)
+        e = next((x for x in emp if x["employee_id"]==emp_id),None)
 
-        if not emp:
-            st.error("Employee not found")
+        if not e:
+            st.error("Not found")
         else:
-            rate = float(emp["hourly_rate"])
-            emp_type = emp["employment_type"]
+            rate = float(e["hourly_rate"])
+            emp_type = e["employment_type"]
 
-            total_hours = 0
-
-            for a in attendance:
+            total = 0
+            for a in att:
                 if (
-                    a["employee_id"] == emp_id and
-                    int(start_date) <= int(a["date"]) <= int(start_date) + 6
+                    a["employee_id"]==emp_id and
+                    int(start)<=int(a["date"])<=int(end)
                 ):
-                    total_hours += float(a["actual_hours"])
+                    total += float(a["actual_hours"])
 
-            reg, ot, gross, tax, net = calculate_pay(total_hours, rate, emp_type)
+            reg,ot,gross,tax,net = calculate_pay(total,rate,emp_type)
 
-            st.success(f"Weekly Pay: {net}")
-            st.write(f"Regular: {reg}")
-            st.write(f"Overtime: {ot}")
-            st.write(f"Gross: {gross}")
-            st.write(f"Tax: {tax}")
+            st.success(f"Net Pay: {net}")
+            st.write(reg,ot,gross,tax)
