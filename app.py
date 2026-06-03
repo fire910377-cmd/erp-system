@@ -32,8 +32,7 @@ h1, h2, h3 {
 # =========================
 @st.cache_resource
 def connect():
-    creds = Credentials.from_service_account_file(
-        "payroll-key.json",
+    creds = Credentials.from_service_account_info(st.secrets["google"])
         scopes=[
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive"
