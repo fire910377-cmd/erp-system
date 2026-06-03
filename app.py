@@ -15,7 +15,7 @@ def connect():
         ]
     )
     client = gspread.authorize(creds)
-    sheet = client.open_by_key("你的sheet id")
+    sheet = client.open_by_key("1Y_BD6eCM_jt-FzwNjVrocPmRGr104pQcY1qoPPN2pnE")
 
     return {
         "emp": sheet.worksheet("Employees"),
