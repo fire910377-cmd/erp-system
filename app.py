@@ -21,9 +21,9 @@ def connect():
     sheet = client.open_by_key("1Y_BD6eCM_jt-FzwNjVrocPmRGr104pQcY1qoPPN2pnE")
 
     return {
-        "emp": sheet.worksheet("employees"),
-        "shift": sheet.worksheet("shift"),
-        "att": sheet.worksheet("attendance")
+        "emp": sheet.worksheet("Employees"),
+        "shift": sheet.worksheet("Shift"),
+        "att": sheet.worksheet("Attendance")
     }
 
 db = connect()
