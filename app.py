@@ -186,7 +186,7 @@ elif menu=="Shift":
         sid=st.text_input("Shift ID")
         for i,s in enumerate(data):
             if s["shift_id"]==sid:
-                db["shift"].update(f"G{i+2}", "Cancelled")
+                db["shift"].update(f"G{i+2}", [["Cancelled"]])
                 st.success("Cancelled")
 
 # =========================
@@ -233,7 +233,7 @@ elif menu=="Attendance":
         for i,a in enumerate(data):
             if a["attendance_id"]==aid:
                 if st.button("Save"):
-                    db["att"].update(f"G{i+2}", note)
+                    db["att"].update(f"G{i+2}", [[note]])
                     st.success("Updated")
 
     elif action=="All":
