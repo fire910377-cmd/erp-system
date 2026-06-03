@@ -122,12 +122,21 @@ if menu=="Employee":
                 [[name,role,dept,rate,t,phone,email]])
                 st.success("Updated")
 
-    elif action=="Profile":
-        eid=st.text_input("Employee ID")
-        emp=next((e for e in data if e["employee_id"]==eid),None)
-        if emp:
-            st.json(emp)
+   elif action=="Profile":
+     eid=st.text_input("Employee ID")
+     emp=next((e for e in data if e["employee_id"]==eid),None)
 
+     if emp:
+        st.subheader("👤 Employee Profile")
+
+        st.write(f"🆔 ID: {emp['employee_id']}")
+        st.write(f"👤 Name: {emp['name']}")
+        st.write(f"💼 Role: {emp['role']}")
+        st.write(f"🏢 Department: {emp['department']}")
+        st.write(f"💰 Hourly Rate: {emp['hourly_rate']}")
+        st.write(f"📊 Type: {emp['employment_type']}")
+        st.write(f"📞 Phone: {emp['phone']}")
+        st.write(f"📧 Email: {emp['email']}")
 # =========================
 # SHIFT（修正欄位 + location）
 # =========================
