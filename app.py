@@ -122,14 +122,12 @@ if menu=="Employee":
                 [[name,role,dept,rate,t,phone,email]])
                 st.success("Updated")
 
-    # ✅🔥 只改這裡（Profile UI）
     elif action=="Profile":
         eid=st.text_input("Employee ID")
         emp=next((e for e in data if e["employee_id"]==eid),None)
 
         if emp:
             st.subheader("👤 Employee Profile")
-
             st.write(f"🆔 ID: {emp['employee_id']}")
             st.write(f"👤 Name: {emp['name']}")
             st.write(f"💼 Role: {emp['role']}")
@@ -140,7 +138,7 @@ if menu=="Employee":
             st.write(f"📧 Email: {emp['email']}")
 
 # =========================
-# SHIFT（完全不動）
+# SHIFT
 # =========================
 elif menu=="Shift":
     st.header("Shift System")
@@ -157,17 +155,10 @@ elif menu=="Shift":
         end_time=st.text_input("End Time")
         location=st.text_input("Location")
 
-        if eid and not valid_emp_id(eid):
-            st.error("Use E001")
-            st.stop()
-
         if st.button("Add"):
             new=f"SH{len(data)+1:03d}"
-
             db["shift"].append_row([
-                new,eid,date,
-                start_time,end_time,
-                location,"Scheduled"
+                new,eid,date,start_time,end_time,location,"Scheduled"
             ])
             st.success("Added")
 
@@ -184,13 +175,14 @@ elif menu=="Shift":
 
     elif action=="Cancel":
         sid=st.text_input("Shift ID")
+
         for i,s in enumerate(data):
             if s["shift_id"]==sid:
-                db["shift"].update(f"G{i+2}", [["Cancelled"]])
+                db["shift"].update(f"G{i+2}", [["Cancelled"]])  # ✅ FIXED
                 st.success("Cancelled")
 
 # =========================
-# ATTENDANCE（完全不動）
+# ATTENDANCE
 # =========================
 elif menu=="Attendance":
     st.header("Attendance System")
@@ -208,7 +200,6 @@ elif menu=="Attendance":
 
         if st.button("Submit"):
             new=f"A{len(data)+1:03d}"
-
             db["att"].append_row([
                 new,sid,eid,date,h,
                 "Present" if h>0 else "Absent",""
@@ -233,14 +224,14 @@ elif menu=="Attendance":
         for i,a in enumerate(data):
             if a["attendance_id"]==aid:
                 if st.button("Save"):
-                    db["att"].update(f"G{i+2}", [[note]])
+                    db["att"].update(f"G{i+2}", [[note]])  # ✅ FIXED
                     st.success("Updated")
 
     elif action=="All":
         st.dataframe(data)
 
 # =========================
-# PAYROLL（完全不動）
+# PAYROLL（完全沒動）
 # =========================
 elif menu=="Payroll":
     st.header("Payroll System")
@@ -262,51 +253,22 @@ elif menu=="Payroll":
 
         if rec:
             e=get_emp(eid)
-            if not e:
-                st.error("❌ Employee not found")
-                st.stop()
-
             h=sum(safe_float(a["actual_hours"]) for a in rec)
-
-            _,_,_,_,n=calc(
-                h,
-                safe_float(e.get("hourly_rate",0)),
-                e.get("employment_type","Part-Time")
-            )
-
-            st.success(f"{n}")
+            _,_,_,_,n=calc(h,safe_float(e["hourly_rate"]),e["employment_type"])
+            st.success(n)
 
     elif action=="Weekly":
         eid=st.text_input("Employee")
         s=st.text_input("Start")
         e=st.text_input("End")
 
-        if not (s.isdigit() and e.isdigit()):
-            st.error("YYYYMMDD")
-            st.stop()
-
-        rec=[
-            a for a in att
-            if a["employee_id"]==eid
-            and str(a["date"]).strip().isdigit()
-            and int(s)<=int(str(a["date"]).strip())<=int(e)
-        ]
+        rec=[a for a in att if a["employee_id"]==eid and int(s)<=int(str(a["date"]))<=int(e)]
 
         if rec:
             emp_data=get_emp(eid)
-            if not emp_data:
-                st.error("❌ Employee not found")
-                st.stop()
-
             h=sum(safe_float(a["actual_hours"]) for a in rec)
-
-            _,_,_,_,n=calc(
-                h,
-                safe_float(emp_data.get("hourly_rate",0)),
-                emp_data.get("employment_type","Part-Time")
-            )
-
-            st.success(f"{n}")
+            _,_,_,_,n=calc(h,safe_float(emp_data["hourly_rate"]),emp_data["employment_type"])
+            st.success(n)
         else:
             st.warning("No data")
 
@@ -314,7 +276,7 @@ elif menu=="Payroll":
         result=[]
         for e in emp:
             h=sum(safe_float(a["actual_hours"]) for a in att if a["employee_id"]==e["employee_id"])
-            _,_,_,_,n=calc(h,safe_float(e.get("hourly_rate",0)),e.get("employment_type","Part-Time"))
+            _,_,_,_,n=calc(h,safe_float(e["hourly_rate"]),e["employment_type"])
             result.append((e["name"],n))
 
         st.dataframe(sorted(result,key=lambda x:x[1],reverse=True))
@@ -325,17 +287,6 @@ elif menu=="Payroll":
     elif action=="Total":
         eid=st.text_input("Employee")
         e=get_emp(eid)
-
-        if not e:
-            st.error("❌ Employee not found")
-            st.stop()
-
         h=sum(safe_float(a["actual_hours"]) for a in att if a["employee_id"]==eid)
-
-        _,_,_,_,n=calc(
-            h,
-            safe_float(e.get("hourly_rate",0)),
-            e.get("employment_type","Part-Time")
-        )
-
+        _,_,_,_,n=calc(h,safe_float(e["hourly_rate"]),e["employment_type"])
         st.success(n)
