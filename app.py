@@ -238,24 +238,29 @@ elif menu=="Payroll":
             st.success(f"💰 ${n}")
             st.write(r,o,g,t)
 
-    # ✅ 只修這裡（Weekly）
+    # ✅ 完整修好 Weekly（不會再炸）
     elif action=="Weekly":
         eid=st.text_input("Employee")
-        s=st.text_input("Start")
-        e=st.text_input("End")
+        s=st.text_input("Start (YYYYMMDD)")
+        e=st.text_input("End (YYYYMMDD)")
 
-        rec = [
-            a for a in att
-            if a["employee_id"] == eid
-            and a["date"]
-            and int(s) <= int(a["date"]) <= int(e)
-        ]
+        if not (s.isdigit() and e.isdigit()):
+            st.error("❌ Please enter date in YYYYMMDD format")
+        else:
+            rec = [
+                a for a in att
+                if a["employee_id"] == eid
+                and str(a["date"]).isdigit()
+                and int(s) <= int(a["date"]) <= int(e)
+            ]
 
-        if rec:
-            emp_data=get_emp(eid)
-            h=sum(float(a["actual_hours"]) for a in rec)
-            _,_,_,_,n=calc(h,float(emp_data["hourly_rate"]),emp_data["employment_type"])
-            st.success(n)
+            if rec:
+                emp_data=get_emp(eid)
+                h=sum(float(a["actual_hours"]) for a in rec)
+                _,_,_,_,n=calc(h,float(emp_data["hourly_rate"]),emp_data["employment_type"])
+                st.success(f"💰 Weekly Salary: {n}")
+            else:
+                st.warning("No data")
 
     # RANKING
     elif action=="Ranking":
