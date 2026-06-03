@@ -89,7 +89,7 @@ if menu == "Employee":
             name=st.text_input("Name",emp["name"])
             role=st.text_input("Role",emp["role"])
             dept=st.text_input("Dept",emp["department"])
-            rate=st.number_input("Rate",value=float(emp["hourly_rate"]))
+            rate=st.number_input("Rate",value=float(emp["hourly_rate"] or 0))
             t=st.selectbox("Type",["Full-Time","Part-Time"])
             phone=st.text_input("Phone",emp["phone"])
             email=st.text_input("Email",emp["email"])
@@ -127,11 +127,11 @@ elif menu=="Shift":
 
     if action=="Add":
         eid=st.text_input("Employee")
-        date=st.text_input("Date")
+        date=st.text_input("Date").strip()
         start=st.text_input("Start")
         end=st.text_input("End")
 
-        conflict=[s for s in data if s["employee_id"]==eid and s["date"]==date]
+        conflict=[s for s in data if s["employee_id"]==eid and str(s["date"]).strip()==date]
 
         if conflict:
             st.error("⚠️ Conflict shift!")
@@ -142,8 +142,11 @@ elif menu=="Shift":
             st.success("Added")
 
     elif action=="By Date":
-        d=st.text_input("Date")
-        st.dataframe([s for s in data if s["date"]==d])
+        d=st.text_input("Date").strip()
+        st.dataframe([
+            s for s in data
+            if str(s["date"]).strip()==d
+        ])
 
     elif action=="By Employee":
         eid=st.text_input("Employee")
@@ -173,7 +176,7 @@ elif menu=="Attendance":
     if action=="Check In":
         eid=st.text_input("Employee")
         sid=st.text_input("Shift ID")
-        date=st.text_input("Date")
+        date=st.text_input("Date").strip()
         hours=st.number_input("Hours",0.0)
 
         status="Present" if hours>0 else "Absent"
@@ -189,8 +192,11 @@ elif menu=="Attendance":
         st.dataframe([a for a in data if a["employee_id"]==eid])
 
     elif action=="By Date":
-        d=st.text_input("Date")
-        st.dataframe([a for a in data if a["date"]==d])
+        d=st.text_input("Date").strip()
+        st.dataframe([
+            a for a in data
+            if str(a["date"]).strip()==d
+        ])
 
     elif action=="No Show":
         st.dataframe([a for a in data if a["status"]=="Absent"])
@@ -223,64 +229,64 @@ elif menu=="Payroll":
     def get_emp(eid):
         return next((e for e in emp if e["employee_id"]==eid),None)
 
-    # DAILY
+    def safe_rate(e):
+        try:
+            return float(e["hourly_rate"])
+        except:
+            return 0
+
     if action=="Daily":
         eid=st.text_input("Employee")
-        d=st.text_input("Date")
+        d=st.text_input("Date").strip()
 
-        rec=[a for a in att if a["employee_id"]==eid and a["date"]==d]
+        rec=[a for a in att if a["employee_id"]==eid and str(a["date"]).strip()==d]
 
         if rec:
             e=get_emp(eid)
             h=sum(float(a["actual_hours"]) for a in rec)
-            r,o,g,t,n=calc(h,float(e["hourly_rate"]),e["employment_type"])
+            r,o,g,t,n=calc(h,safe_rate(e),e["employment_type"])
 
             st.success(f"💰 ${n}")
-            st.write(r,o,g,t)
 
-    # ✅ 完整修好 Weekly（不會再炸）
     elif action=="Weekly":
         eid=st.text_input("Employee")
-        s=st.text_input("Start (YYYYMMDD)")
-        e=st.text_input("End (YYYYMMDD)")
+        s=st.text_input("Start")
+        e=st.text_input("End")
 
         if not (s.isdigit() and e.isdigit()):
-            st.error("❌ Please enter date in YYYYMMDD format")
+            st.error("❌ Use YYYYMMDD")
         else:
-            rec = [
+            rec=[
                 a for a in att
-                if a["employee_id"] == eid
-                and str(a["date"]).isdigit()
-                and int(s) <= int(a["date"]) <= int(e)
+                if a["employee_id"]==eid
+                and str(a["date"]).strip().isdigit()
+                and int(s)<=int(str(a["date"]).strip())<=int(e)
             ]
 
             if rec:
                 emp_data=get_emp(eid)
                 h=sum(float(a["actual_hours"]) for a in rec)
-                _,_,_,_,n=calc(h,float(emp_data["hourly_rate"]),emp_data["employment_type"])
-                st.success(f"💰 Weekly Salary: {n}")
+                _,_,_,_,n=calc(h,safe_rate(emp_data),emp_data["employment_type"])
+                st.success(f"💰 {n}")
             else:
                 st.warning("No data")
 
-    # RANKING
     elif action=="Ranking":
         result=[]
         for e in emp:
             h=sum(float(a["actual_hours"]) for a in att if a["employee_id"]==e["employee_id"])
-            _,_,_,_,n=calc(h,float(e["hourly_rate"]),e["employment_type"])
+            _,_,_,_,n=calc(h,safe_rate(e),e["employment_type"])
             result.append((e["name"],n))
 
         st.dataframe(sorted(result,key=lambda x:x[1],reverse=True))
 
-    # STATS
     elif action=="Stats":
         st.write("Total attendance:",len(att))
 
-    # TOTAL
     elif action=="Total":
         eid=st.text_input("Employee")
         e=get_emp(eid)
 
         h=sum(float(a["actual_hours"]) for a in att if a["employee_id"]==eid)
-        _,_,_,_,n=calc(h,float(e["hourly_rate"]),e["employment_type"])
+        _,_,_,_,n=calc(h,safe_rate(e),e["employment_type"])
         st.success(n)
