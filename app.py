@@ -3,6 +3,18 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # =========================
+# VALIDATION（新增）
+# =========================
+def valid_emp_id(eid):
+    return isinstance(eid, str) and eid.startswith("E") and len(eid)==4 and eid[1:].isdigit()
+
+def valid_shift_id(sid):
+    return isinstance(sid, str) and sid.startswith("SH") and sid[2:].isdigit()
+
+def valid_att_id(aid):
+    return isinstance(aid, str) and aid.startswith("A") and aid[1:].isdigit()
+
+# =========================
 # CONNECT
 # =========================
 @st.cache_resource
@@ -82,7 +94,12 @@ if menu == "Employee":
         st.dataframe(res)
 
     elif action=="Edit":
-        eid=st.text_input("Employee ID")
+        eid=st.text_input("Employee ID").strip()
+
+        if eid and not valid_emp_id(eid):
+            st.error("❌ Employee ID must be like E001")
+            st.stop()
+
         emp=next((e for e in data if e["employee_id"]==eid),None)
 
         if emp:
@@ -101,7 +118,12 @@ if menu == "Employee":
                 st.success("Updated")
 
     elif action=="Profile":
-        eid=st.text_input("Employee ID")
+        eid=st.text_input("Employee ID").strip()
+
+        if eid and not valid_emp_id(eid):
+            st.error("❌ Employee ID must be like E001")
+            st.stop()
+
         emp=next((e for e in data if e["employee_id"]==eid),None)
 
         if emp:
@@ -126,7 +148,12 @@ elif menu=="Shift":
     data=db["shift"].get_all_records()
 
     if action=="Add":
-        eid=st.text_input("Employee")
+        eid=st.text_input("Employee").strip()
+
+        if eid and not valid_emp_id(eid):
+            st.error("❌ Use format E001")
+            st.stop()
+
         date=st.text_input("Date").strip()
         start=st.text_input("Start")
         end=st.text_input("End")
@@ -143,20 +170,27 @@ elif menu=="Shift":
 
     elif action=="By Date":
         d=st.text_input("Date").strip()
-        st.dataframe([
-            s for s in data
-            if str(s["date"]).strip()==d
-        ])
+        st.dataframe([s for s in data if str(s["date"]).strip()==d])
 
     elif action=="By Employee":
-        eid=st.text_input("Employee")
+        eid=st.text_input("Employee").strip()
+
+        if eid and not valid_emp_id(eid):
+            st.error("❌ Use format E001")
+            st.stop()
+
         st.dataframe([s for s in data if s["employee_id"]==eid])
 
     elif action=="Future":
         st.dataframe([s for s in data if s["status"]=="Scheduled"])
 
     elif action=="Cancel":
-        sid=st.text_input("Shift ID")
+        sid=st.text_input("Shift ID").strip()
+
+        if sid and not valid_shift_id(sid):
+            st.error("❌ Shift ID must be SH001")
+            st.stop()
+
         for i,s in enumerate(data):
             if s["shift_id"]==sid:
                 db["shift"].update(f"G{i+2}", "Cancelled")
@@ -174,8 +208,18 @@ elif menu=="Attendance":
     data=db["att"].get_all_records()
 
     if action=="Check In":
-        eid=st.text_input("Employee")
-        sid=st.text_input("Shift ID")
+        eid=st.text_input("Employee").strip()
+
+        if eid and not valid_emp_id(eid):
+            st.error("❌ Employee ID must be E001")
+            st.stop()
+
+        sid=st.text_input("Shift ID").strip()
+
+        if sid and not valid_shift_id(sid):
+            st.error("❌ Shift ID must be SH001")
+            st.stop()
+
         date=st.text_input("Date").strip()
         hours=st.number_input("Hours",0.0)
 
@@ -188,21 +232,28 @@ elif menu=="Attendance":
             st.success("Done")
 
     elif action=="By Employee":
-        eid=st.text_input("Employee")
+        eid=st.text_input("Employee").strip()
+
+        if eid and not valid_emp_id(eid):
+            st.error("❌ Employee ID must be E001")
+            st.stop()
+
         st.dataframe([a for a in data if a["employee_id"]==eid])
 
     elif action=="By Date":
         d=st.text_input("Date").strip()
-        st.dataframe([
-            a for a in data
-            if str(a["date"]).strip()==d
-        ])
+        st.dataframe([a for a in data if str(a["date"]).strip()==d])
 
     elif action=="No Show":
         st.dataframe([a for a in data if a["status"]=="Absent"])
 
     elif action=="Edit Notes":
-        aid=st.text_input("Attendance ID")
+        aid=st.text_input("Attendance ID").strip()
+
+        if aid and not valid_att_id(aid):
+            st.error("❌ Attendance ID must be A001")
+            st.stop()
+
         note=st.text_input("New Note")
 
         for i,a in enumerate(data):
@@ -236,7 +287,12 @@ elif menu=="Payroll":
             return 0
 
     if action=="Daily":
-        eid=st.text_input("Employee")
+        eid=st.text_input("Employee").strip()
+
+        if eid and not valid_emp_id(eid):
+            st.error("❌ Employee ID format wrong (E001)")
+            st.stop()
+
         d=st.text_input("Date").strip()
 
         rec=[a for a in att if a["employee_id"]==eid and str(a["date"]).strip()==d]
@@ -244,12 +300,16 @@ elif menu=="Payroll":
         if rec:
             e=get_emp(eid)
             h=sum(float(a["actual_hours"]) for a in rec)
-            r,o,g,t,n=calc(h,safe_rate(e),e["employment_type"])
-
+            _,_,_,_,n=calc(h,safe_rate(e),e["employment_type"])
             st.success(f"💰 ${n}")
 
     elif action=="Weekly":
-        eid=st.text_input("Employee")
+        eid=st.text_input("Employee").strip()
+
+        if eid and not valid_emp_id(eid):
+            st.error("❌ Employee ID format wrong (E001)")
+            st.stop()
+
         s=st.text_input("Start")
         e=st.text_input("End")
 
@@ -284,9 +344,13 @@ elif menu=="Payroll":
         st.write("Total attendance:",len(att))
 
     elif action=="Total":
-        eid=st.text_input("Employee")
-        e=get_emp(eid)
+        eid=st.text_input("Employee").strip()
 
+        if eid and not valid_emp_id(eid):
+            st.error("❌ Employee ID format wrong (E001)")
+            st.stop()
+
+        e=get_emp(eid)
         h=sum(float(a["actual_hours"]) for a in att if a["employee_id"]==eid)
         _,_,_,_,n=calc(h,safe_rate(e),e["employment_type"])
         st.success(n)
