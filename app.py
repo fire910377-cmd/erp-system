@@ -15,7 +15,7 @@ def connect():
         ]
     )
     client = gspread.authorize(creds)
-    sheet = client.open_by_key("1Y_BD6eCM_jt-FzwNjVrocPmRGr104pQcY1qoPPN2pnE")
+    sheet = client.open_by_key("你的sheet id")
 
     return {
         "emp": sheet.worksheet("Employees"),
@@ -58,7 +58,6 @@ if menu == "Employee":
 
     data = db["emp"].get_all_records()
 
-    # ADD
     if action=="Add":
         name=st.text_input("Name")
         role=st.text_input("Role")
@@ -73,18 +72,15 @@ if menu == "Employee":
             db["emp"].append_row([new,name,role,dept,rate,t,phone,email])
             st.success("Added")
 
-    # VIEW
     elif action=="View":
         sort=st.selectbox("Sort by",["name","department"])
         st.dataframe(sorted(data,key=lambda x:x[sort]))
 
-    # SEARCH
     elif action=="Search":
         key=st.text_input("Keyword")
         res=[e for e in data if key.lower() in str(e).lower()]
         st.dataframe(res)
 
-    # EDIT
     elif action=="Edit":
         eid=st.text_input("Employee ID")
         emp=next((e for e in data if e["employee_id"]==eid),None)
@@ -104,7 +100,6 @@ if menu == "Employee":
                 [[name,role,dept,rate,t,phone,email]])
                 st.success("Updated")
 
-    # PROFILE
     elif action=="Profile":
         eid=st.text_input("Employee ID")
         emp=next((e for e in data if e["employee_id"]==eid),None)
@@ -243,13 +238,18 @@ elif menu=="Payroll":
             st.success(f"💰 ${n}")
             st.write(r,o,g,t)
 
-    # WEEKLY
+    # ✅ 只修這裡（Weekly）
     elif action=="Weekly":
         eid=st.text_input("Employee")
         s=st.text_input("Start")
         e=st.text_input("End")
 
-        rec=[a for a in att if a["employee_id"]==eid and s<=a["date"]<=e]
+        rec = [
+            a for a in att
+            if a["employee_id"] == eid
+            and a["date"]
+            and int(s) <= int(a["date"]) <= int(e)
+        ]
 
         if rec:
             emp_data=get_emp(eid)
