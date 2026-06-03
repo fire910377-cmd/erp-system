@@ -1,133 +1,183 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime, timedelta
-import pandas as pd
 
 # =========================
-# CONFIG
-# =========================
-st.set_page_config(page_title="ERP System", layout="wide")
-
-# =========================
-# STYLE (🔥 UI美化)
-# =========================
-st.markdown("""
-<style>
-.main {
-    background-color: #f5f7fa;
-}
-h1, h2, h3 {
-    color: #1f3c88;
-}
-.stButton>button {
-    background-color: #1f77b4;
-    color: white;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# =========================
-# CONNECT
+# Google Sheets 連線（雲端版）
 # =========================
 @st.cache_resource
 def connect():
-   creds = Credentials.from_service_account_info(
-    st.secrets["google"],
-    scopes=[
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ]
-)
+    creds = Credentials.from_service_account_info(
+        st.secrets["google"],
+        scopes=[
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ]
+    )
+
     client = gspread.authorize(creds)
     sheet = client.open_by_key("1Y_BD6eCM_jt-FzwNjVrocPmRGr104pQcY1qoPPN2pnE")
 
     return {
-        "emp": sheet.worksheet("Employees"),
-        "shift": sheet.worksheet("Shifts"),
-        "att": sheet.worksheet("Attendance")
+        "employees": sheet.worksheet("Employees"),
+        "shifts": sheet.worksheet("Shifts"),
+        "attendance": sheet.worksheet("Attendance")
     }
 
 tabs = connect()
 
-emp = tabs["emp"].get_all_records()
-att = tabs["att"].get_all_records()
-
 # =========================
-# PAY CALC
+# Helper
 # =========================
-def calc_pay(rec, emp):
-    h = float(rec.get("actual_hours", 0))
-    r = float(emp.get("hourly_rate", 0))
-
-    if emp.get("employment_type") == "Full-Time":
-        reg = min(h, 8) * r
-        ot = max(0, h - 8) * r * 1.5
+def calculate_pay(hours, rate, emp_type):
+    if emp_type == "Full-Time":
+        regular = min(hours, 8) * rate
+        overtime = max(0, hours - 8) * rate * 1.5
     else:
-        reg = h * r
-        ot = 0
+        regular = hours * rate
+        overtime = 0
 
-    gross = reg + ot
+    gross = regular + overtime
     tax = gross * 0.1
     net = gross - tax
-    return reg, ot, gross, tax, net
+
+    return regular, overtime, gross, tax, net
 
 # =========================
-# TITLE
+# UI
 # =========================
-st.title("🏢 Enterprise ERP System")
+st.set_page_config(page_title="ERP System", layout="wide")
+st.title("🏢 ERP FULL SYSTEM")
 
-menu = st.sidebar.radio("Navigation", ["Employees", "Payroll Dashboard"])
+menu = st.sidebar.selectbox(
+    "Menu",
+    ["Employee Management", "Shift Management", "Attendance", "Payroll"]
+)
 
 # =========================
-# EMPLOYEE
+# 員工管理
 # =========================
-if menu == "Employees":
+if menu == "Employee Management":
     st.header("👥 Employee Management")
 
-    df = pd.DataFrame(emp)
-    st.dataframe(df, use_container_width=True)
+    action = st.selectbox("Action", ["Add Employee", "View Employees"])
+
+    if action == "Add Employee":
+        name = st.text_input("Name")
+        role = st.text_input("Role")
+        dept = st.text_input("Department")
+        rate = st.number_input("Hourly Rate", min_value=0.0)
+        emp_type = st.selectbox("Type", ["Full-Time", "Part-Time"])
+        phone = st.text_input("Phone")
+        email = st.text_input("Email")
+
+        if st.button("Add Employee"):
+            data = tabs["employees"].get_all_records()
+            new_id = f"E{len(data)+1:03d}"
+
+            tabs["employees"].append_row([
+                new_id, name, role, dept, rate, emp_type, phone, email
+            ])
+
+            st.success(f"Employee {new_id} added!")
+
+    elif action == "View Employees":
+        data = tabs["employees"].get_all_records()
+        st.dataframe(data)
 
 # =========================
-# PAYROLL DASHBOARD (🔥圖表)
+# 排班管理
 # =========================
-elif menu == "Payroll Dashboard":
+elif menu == "Shift Management":
+    st.header("📅 Shift Management")
 
-    st.header("📊 Payroll Analytics")
+    action = st.selectbox("Action", ["Add Shift", "View Shifts"])
 
-    df_emp = pd.DataFrame(emp)
-    df_att = pd.DataFrame(att)
+    if action == "Add Shift":
+        emp_id = st.text_input("Employee ID")
+        date = st.text_input("Date (YYYYMMDD)")
+        start = st.text_input("Start Time")
+        end = st.text_input("End Time")
+        location = st.text_input("Location")
 
-    if not df_att.empty:
+        if st.button("Add Shift"):
+            data = tabs["shifts"].get_all_records()
+            new_id = f"SH{len(data)+1:03d}"
 
-        merged = df_att.merge(df_emp, on="employee_id")
+            tabs["shifts"].append_row([
+                new_id, emp_id, date, start, end, location, "Scheduled"
+            ])
 
-        merged["net"] = merged.apply(
-            lambda x: calc_pay(x, x)[4], axis=1
-        )
+            st.success(f"Shift {new_id} created!")
 
-        # 🔥 圖表1：薪資排名
-        st.subheader("🏆 Salary Ranking")
+    elif action == "View Shifts":
+        data = tabs["shifts"].get_all_records()
+        st.dataframe(data)
 
-        rank = merged.groupby("employee_id")["net"].sum().reset_index()
+# =========================
+# 出勤管理
+# =========================
+elif menu == "Attendance":
+    st.header("🕒 Attendance")
 
-        st.bar_chart(rank.set_index("employee_id"))
+    action = st.selectbox("Action", ["Check In", "View Attendance"])
 
-        # 🔥 圖表2：每日薪資趨勢
-        st.subheader("📈 Daily Salary Trend")
+    if action == "Check In":
+        emp_id = st.text_input("Employee ID")
+        shift_id = st.text_input("Shift ID")
+        date = st.text_input("Date (YYYYMMDD)")
+        hours = st.number_input("Work Hours", min_value=0.0)
+        status = st.selectbox("Status", ["Present", "Absent"])
+        notes = st.text_input("Notes")
 
-        trend = merged.groupby("date")["net"].sum().reset_index()
+        if st.button("Submit Attendance"):
+            data = tabs["attendance"].get_all_records()
+            new_id = f"A{len(data)+1:03d}"
 
-        st.line_chart(trend.set_index("date"))
+            tabs["attendance"].append_row([
+                new_id, shift_id, emp_id, date, hours, status, notes
+            ])
 
-        # 🔥 KPI
-        st.subheader("📌 KPI")
+            st.success(f"Attendance {new_id} recorded!")
 
-        col1, col2, col3 = st.columns(3)
+    elif action == "View Attendance":
+        data = tabs["attendance"].get_all_records()
+        st.dataframe(data)
 
-        col1.metric("Total Salary", int(merged["net"].sum()))
-        col2.metric("Avg Salary", int(merged["net"].mean()))
-        col3.metric("Total Records", len(merged))
+# =========================
+# 薪資系統
+# =========================
+elif menu == "Payroll":
+    st.header("💰 Payroll System")
 
-    else:
-        st.warning("No attendance data")
+    emp_id = st.text_input("Employee ID")
+    start_date = st.text_input("Start Date (YYYYMMDD)")
+
+    if st.button("Calculate Weekly Pay"):
+        attendance = tabs["attendance"].get_all_records()
+        employees = tabs["employees"].get_all_records()
+
+        emp = next((e for e in employees if e["employee_id"] == emp_id), None)
+
+        if not emp:
+            st.error("Employee not found")
+        else:
+            rate = float(emp["hourly_rate"])
+            emp_type = emp["employment_type"]
+
+            total_hours = 0
+
+            for a in attendance:
+                if (
+                    a["employee_id"] == emp_id and
+                    int(start_date) <= int(a["date"]) <= int(start_date) + 6
+                ):
+                    total_hours += float(a["actual_hours"])
+
+            reg, ot, gross, tax, net = calculate_pay(total_hours, rate, emp_type)
+
+            st.success(f"Weekly Pay: {net}")
+            st.write(f"Regular: {reg}")
+            st.write(f"Overtime: {ot}")
+            st.write(f"Gross: {gross}")
+            st.write(f"Tax: {tax}")
