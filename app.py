@@ -5,14 +5,20 @@ from google.oauth2.service_account import Credentials
 # =========================
 # VALIDATION
 # =========================
-def valid_emp_id(eid):
-    return isinstance(eid,str) and eid.startswith("E") and len(eid)==4 and eid[1:].isdigit()
+def valid_emp_id(e):
+    return isinstance(e,str) and e.startswith("E") and len(e)==4 and e[1:].isdigit()
 
-def valid_shift_id(sid):
-    return isinstance(sid,str) and sid.startswith("SH")
+def valid_shift_id(s):
+    return isinstance(s,str) and s.startswith("SH")
 
-def valid_att_id(aid):
-    return isinstance(aid,str) and aid.startswith("A")
+def valid_att_id(a):
+    return isinstance(a,str) and a.startswith("A")
+
+def safe_float(x):
+    try:
+        return float(x)
+    except:
+        return 0
 
 # =========================
 # CONNECT
@@ -27,7 +33,6 @@ def connect():
         ]
     )
     client = gspread.authorize(creds)
-
     sheet = client.open_by_key("1Y_BD6eCM_jt-FzwNjVrocPmRGr104pQcY1qoPPN2pnE")
 
     return {
@@ -39,7 +44,7 @@ def connect():
 db = connect()
 
 # =========================
-# PAY
+# PAY CALC
 # =========================
 def calc(h,rate,t):
     if t=="Full-Time":
@@ -52,156 +57,190 @@ def calc(h,rate,t):
     tax=gross*0.1
     return reg,ot,gross,tax,gross-tax
 
-def safe_float(x):
-    try:
-        return float(x)
-    except:
-        return 0
-
 # =========================
 # UI
 # =========================
 st.title("🏢 ERP SYSTEM")
 
-menu=st.sidebar.selectbox("Menu",
+menu = st.sidebar.selectbox("Menu",
 ["Employee","Shift","Attendance","Payroll"])
 
 # =========================
-# EMPLOYEE（不動）
+# EMPLOYEE
 # =========================
 if menu=="Employee":
-    st.header("Employee")
+    st.header("Employee System")
+
+    action=st.selectbox("Action",
+    ["Add","View","Search","Edit","Profile"])
 
     data=db["emp"].get_all_records()
 
-    st.dataframe(data)
+    if action=="Add":
+        name=st.text_input("Name")
+        role=st.text_input("Role")
+        dept=st.text_input("Department")
+        rate=st.number_input("Hourly Rate",0.0)
+        t=st.selectbox("Type",["Full-Time","Part-Time"])
+        phone=st.text_input("Phone")
+        email=st.text_input("Email")
+
+        if st.button("Add"):
+            new=f"E{len(data)+1:03d}"
+            db["emp"].append_row([new,name,role,dept,rate,t,phone,email])
+            st.success("Added")
+
+    elif action=="View":
+        st.dataframe(data)
+
+    elif action=="Search":
+        k=st.text_input("Keyword")
+        res=[e for e in data if k.lower() in str(e).lower()]
+        st.dataframe(res)
+
+    elif action=="Edit":
+        eid=st.text_input("Employee ID")
+
+        if eid and not valid_emp_id(eid):
+            st.error("Use E001 format")
+            st.stop()
+
+        emp=next((e for e in data if e["employee_id"]==eid),None)
+
+        if emp:
+            name=st.text_input("Name",emp["name"])
+            role=st.text_input("Role",emp["role"])
+            dept=st.text_input("Department",emp["department"])
+            rate=st.number_input("Rate",value=safe_float(emp["hourly_rate"]))
+            t=st.selectbox("Type",["Full-Time","Part-Time"])
+            phone=st.text_input("Phone",emp["phone"])
+            email=st.text_input("Email",emp["email"])
+
+            if st.button("Save"):
+                row=data.index(emp)+2
+                db["emp"].update(f"B{row}:H{row}",
+                [[name,role,dept,rate,t,phone,email]])
+                st.success("Updated")
+
+    elif action=="Profile":
+        eid=st.text_input("Employee ID")
+
+        emp=next((e for e in data if e["employee_id"]==eid),None)
+
+        if emp:
+            st.json(emp)
 
 # =========================
-# SHIFT（修正欄位）
+# SHIFT
 # =========================
 elif menu=="Shift":
     st.header("Shift System")
 
     action=st.selectbox("Action",
-    ["Add","By Date","By Employee"])
+    ["Add","By Date","By Employee","Future","Cancel"])
 
     data=db["shift"].get_all_records()
 
     if action=="Add":
-        eid=st.text_input("Employee").strip()
-
-        if eid and not valid_emp_id(eid):
-            st.error("❌ Use E001")
-            st.stop()
-
-        date=st.text_input("Date").strip()
+        eid=st.text_input("Employee")
+        date=st.text_input("Date")
         start_time=st.text_input("Start Time")
         end_time=st.text_input("End Time")
         location=st.text_input("Location")
+
+        if eid and not valid_emp_id(eid):
+            st.error("Use E001")
+            st.stop()
 
         if st.button("Add"):
             new=f"SH{len(data)+1:03d}"
 
             db["shift"].append_row([
-                new,
-                eid,
-                date,
-                start_time,
-                end_time,
-                location,
-                "Scheduled"
+                new,eid,date,
+                start_time,end_time,
+                location,"Scheduled"
             ])
-
             st.success("Added")
 
     elif action=="By Date":
-        d=st.text_input("Date").strip()
-
+        d=st.text_input("Date")
         res=[s for s in data if str(s["date"]).strip()==d]
-
-        if not res:
-            st.warning("No data")
-
         st.dataframe(res)
 
     elif action=="By Employee":
-        eid=st.text_input("Employee").strip()
-
-        if eid and not valid_emp_id(eid):
-            st.error("❌ Use E001")
-            st.stop()
-
+        eid=st.text_input("Employee")
         res=[s for s in data if s["employee_id"]==eid]
-
-        if not res:
-            st.warning("No data")
-
         st.dataframe(res)
 
+    elif action=="Future":
+        st.dataframe([s for s in data if s["status"]=="Scheduled"])
+
+    elif action=="Cancel":
+        sid=st.text_input("Shift ID")
+
+        for i,s in enumerate(data):
+            if s["shift_id"]==sid:
+                db["shift"].update(f"G{i+2}", "Cancelled")
+                st.success("Cancelled")
+
 # =========================
-# ATTENDANCE（修正日期）
+# ATTENDANCE
 # =========================
 elif menu=="Attendance":
-    st.header("Attendance")
+    st.header("Attendance System")
 
     action=st.selectbox("Action",
-    ["Check In","By Date","By Employee"])
+    ["Check In","By Employee","By Date","No Show","Edit Notes","All"])
 
     data=db["att"].get_all_records()
 
     if action=="Check In":
-        eid=st.text_input("Employee").strip()
-        sid=st.text_input("Shift ID").strip()
-        date=st.text_input("Date").strip()
+        eid=st.text_input("Employee")
+        sid=st.text_input("Shift ID")
+        date=st.text_input("Date")
         h=st.number_input("Hours",0.0)
-
-        if eid and not valid_emp_id(eid):
-            st.error("❌ E001")
-            st.stop()
 
         if st.button("Submit"):
             new=f"A{len(data)+1:03d}"
 
             db["att"].append_row([
-                new,
-                sid,
-                eid,
-                date,
-                h,
-                "Present" if h>0 else "Absent",
-                ""
+                new,sid,eid,date,h,
+                "Present" if h>0 else "Absent",""
             ])
-
             st.success("Done")
 
-    elif action=="By Date":
-        d=st.text_input("Date").strip()
-
-        res=[a for a in data if str(a["date"]).strip()==d]
-
-        if not res:
-            st.warning("No data")
-
-        st.dataframe(res)
-
     elif action=="By Employee":
-        eid=st.text_input("Employee").strip()
+        eid=st.text_input("Employee")
+        st.dataframe([a for a in data if a["employee_id"]==eid])
 
-        res=[a for a in data if a["employee_id"]==eid]
+    elif action=="By Date":
+        d=st.text_input("Date")
+        st.dataframe([a for a in data if str(a["date"]).strip()==d])
 
-        if not res:
-            st.warning("No data")
+    elif action=="No Show":
+        st.dataframe([a for a in data if a["status"]=="Absent"])
 
-        st.dataframe(res)
+    elif action=="Edit Notes":
+        aid=st.text_input("Attendance ID")
+        note=st.text_input("Note")
+
+        for i,a in enumerate(data):
+            if a["attendance_id"]==aid:
+                if st.button("Save"):
+                    db["att"].update(f"G{i+2}", note)
+                    st.success("Updated")
+
+    elif action=="All":
+        st.dataframe(data)
 
 # =========================
-# PAYROLL（修正所有錯）
+# PAYROLL
 # =========================
 elif menu=="Payroll":
-    st.header("Payroll")
+    st.header("Payroll System")
 
     action=st.selectbox("Action",
-    ["Daily","Weekly"])
+    ["Daily","Weekly","Ranking","Stats","Total"])
 
     emp=db["emp"].get_all_records()
     att=db["att"].get_all_records()
@@ -210,42 +249,21 @@ elif menu=="Payroll":
         return next((e for e in emp if e["employee_id"]==eid),None)
 
     if action=="Daily":
-        eid=st.text_input("Employee").strip()
-        d=st.text_input("Date").strip()
+        eid=st.text_input("Employee")
+        d=st.text_input("Date")
 
-        rec=[
-            a for a in att
-            if a["employee_id"]==eid
-            and str(a["date"]).strip()==d
-        ]
+        rec=[a for a in att if a["employee_id"]==eid and str(a["date"]).strip()==d]
 
         if rec:
             e=get_emp(eid)
-
-            if not e:
-                st.error("Employee not found")
-                st.stop()
-
             h=sum(safe_float(a["actual_hours"]) for a in rec)
-
-            _,_,_,_,n=calc(
-                h,
-                safe_float(e.get("hourly_rate",0)),
-                e.get("employment_type","Part-Time")
-            )
-
-            st.success(f"💰 {n}")
-        else:
-            st.warning("No data")
+            _,_,_,_,n=calc(h,safe_float(e["hourly_rate"]),e["employment_type"])
+            st.success(f"{n}")
 
     elif action=="Weekly":
-        eid=st.text_input("Employee").strip()
+        eid=st.text_input("Employee")
         s=st.text_input("Start")
         e=st.text_input("End")
-
-        if not (s.isdigit() and e.isdigit()):
-            st.error("❌ YYYYMMDD")
-            st.stop()
 
         rec=[
             a for a in att
@@ -256,19 +274,27 @@ elif menu=="Payroll":
 
         if rec:
             emp_data=get_emp(eid)
-
-            if not emp_data:
-                st.error("Employee not found")
-                st.stop()
-
             h=sum(safe_float(a["actual_hours"]) for a in rec)
-
-            _,_,_,_,n=calc(
-                h,
-                safe_float(emp_data.get("hourly_rate",0)),
-                emp_data.get("employment_type","Part-Time")
-            )
-
-            st.success(f"💰 {n}")
+            _,_,_,_,n=calc(h,safe_float(emp_data["hourly_rate"]),emp_data["employment_type"])
+            st.success(f"{n}")
         else:
             st.warning("No data")
+
+    elif action=="Ranking":
+        result=[]
+        for e in emp:
+            h=sum(safe_float(a["actual_hours"]) for a in att if a["employee_id"]==e["employee_id"])
+            _,_,_,_,n=calc(h,safe_float(e["hourly_rate"]),e["employment_type"])
+            result.append((e["name"],n))
+
+        st.dataframe(sorted(result,key=lambda x:x[1],reverse=True))
+
+    elif action=="Stats":
+        st.write("Total records:",len(att))
+
+    elif action=="Total":
+        eid=st.text_input("Employee")
+        e=get_emp(eid)
+        h=sum(safe_float(a["actual_hours"]) for a in att if a["employee_id"]==eid)
+        _,_,_,_,n=calc(h,safe_float(e["hourly_rate"]),e["employment_type"])
+        st.success(n)
