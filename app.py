@@ -66,7 +66,7 @@ menu = st.sidebar.selectbox("Menu",
 ["Employee","Shift","Attendance","Payroll"])
 
 # =========================
-# EMPLOYEE（完整保留）
+# EMPLOYEE
 # =========================
 if menu=="Employee":
     st.header("Employee System")
@@ -122,23 +122,25 @@ if menu=="Employee":
                 [[name,role,dept,rate,t,phone,email]])
                 st.success("Updated")
 
-   elif action=="Profile":
-     eid=st.text_input("Employee ID")
-     emp=next((e for e in data if e["employee_id"]==eid),None)
+    # ✅🔥 只改這裡（Profile UI）
+    elif action=="Profile":
+        eid=st.text_input("Employee ID")
+        emp=next((e for e in data if e["employee_id"]==eid),None)
 
-     if emp:
-        st.subheader("👤 Employee Profile")
+        if emp:
+            st.subheader("👤 Employee Profile")
 
-        st.write(f"🆔 ID: {emp['employee_id']}")
-        st.write(f"👤 Name: {emp['name']}")
-        st.write(f"💼 Role: {emp['role']}")
-        st.write(f"🏢 Department: {emp['department']}")
-        st.write(f"💰 Hourly Rate: {emp['hourly_rate']}")
-        st.write(f"📊 Type: {emp['employment_type']}")
-        st.write(f"📞 Phone: {emp['phone']}")
-        st.write(f"📧 Email: {emp['email']}")
+            st.write(f"🆔 ID: {emp['employee_id']}")
+            st.write(f"👤 Name: {emp['name']}")
+            st.write(f"💼 Role: {emp['role']}")
+            st.write(f"🏢 Department: {emp['department']}")
+            st.write(f"💰 Hourly Rate: {emp['hourly_rate']}")
+            st.write(f"📊 Type: {emp['employment_type']}")
+            st.write(f"📞 Phone: {emp['phone']}")
+            st.write(f"📧 Email: {emp['email']}")
+
 # =========================
-# SHIFT（修正欄位 + location）
+# SHIFT（完全不動）
 # =========================
 elif menu=="Shift":
     st.header("Shift System")
@@ -188,7 +190,7 @@ elif menu=="Shift":
                 st.success("Cancelled")
 
 # =========================
-# ATTENDANCE（完整保留）
+# ATTENDANCE（完全不動）
 # =========================
 elif menu=="Attendance":
     st.header("Attendance System")
@@ -238,7 +240,7 @@ elif menu=="Attendance":
         st.dataframe(data)
 
 # =========================
-# PAYROLL（🔥只修錯誤）
+# PAYROLL（完全不動）
 # =========================
 elif menu=="Payroll":
     st.header("Payroll System")
@@ -260,7 +262,6 @@ elif menu=="Payroll":
 
         if rec:
             e=get_emp(eid)
-
             if not e:
                 st.error("❌ Employee not found")
                 st.stop()
@@ -293,7 +294,6 @@ elif menu=="Payroll":
 
         if rec:
             emp_data=get_emp(eid)
-
             if not emp_data:
                 st.error("❌ Employee not found")
                 st.stop()
