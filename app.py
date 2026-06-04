@@ -153,7 +153,7 @@ with tab3:
         st.dataframe(att_list if att_list else [{"Info":"No data"}])
 
 # =====================================================
-# 💵 PAYROLL（已修）
+# 💵 PAYROLL（最終正確版）
 # =====================================================
 with tab4:
     st.header("Payroll System")
@@ -171,6 +171,7 @@ with tab4:
 
                 emp = next(e for e in emp_list if e["employee_id"]==eid)
 
+                # ✅ 正確欄位
                 hours = safe_float(a.get("actual_hours",0))
                 rate = safe_float(emp.get("hourly_rate",0))
 
@@ -195,6 +196,7 @@ with tab4:
 
                 emp = next(e for e in emp_list if e["employee_id"]==eid)
 
+                # ✅ 正確欄位
                 hours = safe_float(a.get("actual_hours",0))
                 rate = safe_float(emp.get("hourly_rate",0))
 
@@ -214,6 +216,7 @@ with tab4:
 
             emp = next(e for e in emp_list if e["employee_id"]==eid)
 
+            # ✅ 正確欄位
             hours = safe_float(a.get("actual_hours",0))
             rate = safe_float(emp.get("hourly_rate",0))
 
@@ -221,10 +224,10 @@ with tab4:
 
             res[eid] = res.get(eid,0) + pay
 
-        st.dataframe(
-            sorted(res.items(), key=lambda x:x[1], reverse=True)
-            if res else [{"Info":"No data"}]
-        )
+        if not res:
+            st.warning("⚠️ No data")
+        else:
+            st.dataframe(sorted(res.items(), key=lambda x:x[1], reverse=True))
 
     elif action == "Stats":
         res = {}
@@ -232,10 +235,11 @@ with tab4:
         for a in att_list:
             res[a["status"]] = res.get(a["status"],0)+1
 
-        st.dataframe(
-            [{"Status":k,"Count":v} for k,v in res.items()]
-            if res else [{"Info":"No data"}]
-        )
+        if not res:
+            st.warning("⚠️ No data")
+        else:
+            table = [{"Status":k,"Count":v} for k,v in res.items()]
+            st.dataframe(table)
 
     elif action == "Total":
         total = 0
@@ -244,6 +248,7 @@ with tab4:
             eid = a["employee_id"]
             emp = next(e for e in emp_list if e["employee_id"]==eid)
 
+            # ✅ 正確欄位
             hours = safe_float(a.get("actual_hours",0))
             rate = safe_float(emp.get("hourly_rate",0))
 
