@@ -85,126 +85,7 @@ emp_ids = [e["employee_id"] for e in emp_list]
 tab1, tab2, tab3, tab4 = st.tabs(["Employees", "Shifts", "Attendance", "Payroll"])
 
 # =====================================================
-# 👥 EMPLOYEE
-# =====================================================
-with tab1:
-    st.header("Employee System")
-
-    action = st.selectbox("Action", ["View", "Add", "Edit", "Search", "Profile"])
-
-    if action == "View":
-        st.dataframe(emp_list)
-
-    elif action == "Add":
-        eid = fix_employee_id(st.text_input("Employee ID"))
-        name = st.text_input("Name")
-        role = st.text_input("Role")
-        dept = st.text_input("Department")
-        rate = st.text_input("Hourly Rate")
-        etype = st.selectbox("Type", ["Full-Time", "Part-Time"])
-        phone = st.text_input("Phone")
-        email = st.text_input("Email")
-
-        if st.button("Add", key="emp_add"):
-            db["emp"].append_row([eid,name,role,dept,rate,etype,phone,email])
-            st.success("Added")
-
-    elif action == "Edit":
-        eid = st.selectbox("Employee", emp_ids)
-        emp = next(e for e in emp_list if e["employee_id"] == eid)
-
-        name = st.text_input("Name", emp["name"])
-        role = st.text_input("Role", emp["role"])
-        dept = st.text_input("Department", emp["department"])
-        rate = st.text_input("Hourly Rate", emp["hourly_rate"])
-        etype = st.selectbox("Type", ["Full-Time","Part-Time"])
-        phone = st.text_input("Phone", emp["phone"])
-        email = st.text_input("Email", emp["email"])
-
-        if st.button("Save", key="emp_save"):
-            i = emp_list.index(emp)
-            db["emp"].update(f"A{i+2}:H{i+2}", [[eid,name,role,dept,rate,etype,phone,email]])
-            st.success("Updated")
-
-    elif action == "Search":
-        keyword = st.text_input("Search")
-        res = [e for e in emp_list if keyword.lower() in str(e).lower()]
-        st.dataframe(res)
-
-    elif action == "Profile":
-        eid = st.selectbox("Employee", emp_ids)
-        emp = next(e for e in emp_list if e["employee_id"] == eid)
-
-        st.subheader("👤 Employee Profile")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.write(f"🆔 ID: {emp['employee_id']}")
-            st.write(f"👤 Name: {emp['name']}")
-            st.write(f"💼 Role: {emp['role']}")
-            st.write(f"🏢 Department: {emp['department']}")
-
-        with col2:
-            st.write(f"💰 Hourly Rate: {emp['hourly_rate']}")
-            st.write(f"📊 Type: {emp['employment_type']}")
-            st.write(f"📞 Phone: {emp['phone']}")
-            st.write(f"📧 Email: {emp['email']}")
-
-# =====================================================
-# 📅 SHIFT
-# =====================================================
-with tab2:
-    st.header("Shift System")
-
-    action = st.selectbox("Action", ["Add","By Date","By Employee","Cancel","Future"])
-
-    if action == "Add":
-        eid = fix_employee_id(st.selectbox("Employee", emp_ids))
-        date = fix_date(st.text_input("Date"))
-        start = fix_time(st.text_input("Start"))
-        end = fix_time(st.text_input("End"))
-        location = st.text_input("Location")
-
-        if start >= end:
-            error("End time must be after start")
-
-        for s in shift_list:
-            if s["employee_id"] == eid and str(s["date"]) == str(date):
-                if not (end <= s["start_time"] or start >= s["end_time"]):
-                    error("Shift conflict")
-
-        if st.button("Add", key="shift_add"):
-            sid = f"S{len(shift_list)+1:03d}"
-            db["shift"].append_row([sid,eid,date,start,end,location,"Scheduled"])
-            st.success("Added")
-
-    elif action == "Cancel":
-        sid = st.text_input("Shift ID")
-
-        if st.button("Cancel", key="shift_cancel"):
-            found = False
-            for i,s in enumerate(shift_list):
-                if s["shift_id"] == sid:
-                    db["shift"].update(f"G{i+2}", [["Cancelled"]])
-                    st.success("Cancelled")
-                    found = True
-            if not found:
-                st.warning("⚠️ Shift ID not found")
-
-    elif action == "By Date":
-        d = fix_date(st.text_input("Date"))
-        st.dataframe([s for s in shift_list if str(s["date"]) == d])
-
-    elif action == "By Employee":
-        eid = fix_employee_id(st.selectbox("Employee", emp_ids))
-        st.dataframe([s for s in shift_list if s["employee_id"] == eid])
-
-    elif action == "Future":
-        st.dataframe([s for s in shift_list if s["status"]=="Scheduled"])
-
-# =====================================================
-# ⏰ ATTENDANCE
+# ⏰ ATTENDANCE（已修）
 # =====================================================
 with tab3:
     st.header("Attendance System")
@@ -219,15 +100,40 @@ with tab3:
         status = "No-Show" if h==0 else ("Late" if h<8 else "Present")
 
         if st.button("Clock", key="att_clock"):
-            # 找 shift_id
+            # 🔥 找 shift_id
             shift_id = "-"
             for s in shift_list:
-                if s["employee_id"] == eid and str(s["date"]) == date:
+                if s["employee_id"] == eid and str(s["date"]) == str(date):
                     shift_id = s["shift_id"]
 
             aid = f"A{len(att_list)+1:03d}"
-            db["att"].append_row([aid,shift_id,eid,date,h,status,""])
+
+            # 🔥 寫入正確欄位順序
+            db["att"].append_row([
+                aid,
+                shift_id,
+                eid,
+                str(date),
+                h,
+                status,
+                ""
+            ])
+
             st.success("Recorded")
+
+    elif action == "By Employee":
+        eid = fix_employee_id(st.selectbox("Employee", emp_ids))
+        res = [a for a in att_list if a["employee_id"] == eid]
+        st.dataframe(res if res else [{"Info":"No data"}])
+
+    elif action == "By Date":
+        d = fix_date(st.text_input("Date"))
+        res = [a for a in att_list if str(a["date"]) == str(d)]
+        st.dataframe(res if res else [{"Info":"No data"}])
+
+    elif action == "No-show":
+        res = [a for a in att_list if a["status"]=="No-Show"]
+        st.dataframe(res if res else [{"Info":"No data"}])
 
     elif action == "Edit Notes":
         aid = st.text_input("Attendance ID")
@@ -243,22 +149,11 @@ with tab3:
             if not found:
                 st.warning("⚠️ Attendance ID not found")
 
-    elif action == "By Employee":
-        eid = fix_employee_id(st.selectbox("Employee", emp_ids))
-        st.dataframe([a for a in att_list if a["employee_id"] == eid])
-
-    elif action == "By Date":
-        d = fix_date(st.text_input("Date"))
-        st.dataframe([a for a in att_list if str(a["date"]) == d])
-
-    elif action == "No-show":
-        st.dataframe([a for a in att_list if a["status"]=="No-Show"])
-
     elif action == "All":
-        st.dataframe(att_list)
+        st.dataframe(att_list if att_list else [{"Info":"No data"}])
 
 # =====================================================
-# 💵 PAYROLL
+# 💵 PAYROLL（已修）
 # =====================================================
 with tab4:
     st.header("Payroll System")
@@ -270,10 +165,17 @@ with tab4:
         d = fix_date(st.text_input("Date"))
 
         found = False
+
         for a in att_list:
-            if a["employee_id"]==eid and str(a["date"])==d:
+            if a["employee_id"]==eid and str(a["date"])==str(d):
+
                 emp = next(e for e in emp_list if e["employee_id"]==eid)
-                pay = safe_float(a["actual_hours"]) * safe_float(emp["hourly_rate"])
+
+                hours = safe_float(a.get("actual_hours",0))
+                rate = safe_float(emp.get("hourly_rate",0))
+
+                pay = hours * rate
+
                 st.success(f"💵 ${pay}")
                 found = True
 
@@ -289,9 +191,14 @@ with tab4:
         found = False
 
         for a in att_list:
-            if a["employee_id"]==eid and int(s)<=int(a["date"])<=int(e):
+            if a["employee_id"]==eid and int(s)<=int(str(a["date"]))<=int(e):
+
                 emp = next(e for e in emp_list if e["employee_id"]==eid)
-                total += safe_float(a["actual_hours"]) * safe_float(emp["hourly_rate"])
+
+                hours = safe_float(a.get("actual_hours",0))
+                rate = safe_float(emp.get("hourly_rate",0))
+
+                total += hours * rate
                 found = True
 
         if found:
@@ -301,34 +208,46 @@ with tab4:
 
     elif action == "Ranking":
         res = {}
+
         for a in att_list:
             eid = a["employee_id"]
-            emp = next(e for e in emp_list if e["employee_id"]==eid)
-            pay = safe_float(a["actual_hours"]) * safe_float(emp["hourly_rate"])
-            res[eid] = res.get(eid,0)+pay
 
-        if not res:
-            st.warning("⚠️ No data")
-        else:
-            st.dataframe(sorted(res.items(), key=lambda x:x[1], reverse=True))
+            emp = next(e for e in emp_list if e["employee_id"]==eid)
+
+            hours = safe_float(a.get("actual_hours",0))
+            rate = safe_float(emp.get("hourly_rate",0))
+
+            pay = hours * rate
+
+            res[eid] = res.get(eid,0) + pay
+
+        st.dataframe(
+            sorted(res.items(), key=lambda x:x[1], reverse=True)
+            if res else [{"Info":"No data"}]
+        )
 
     elif action == "Stats":
         res = {}
+
         for a in att_list:
             res[a["status"]] = res.get(a["status"],0)+1
 
-        if not res:
-            st.warning("⚠️ No data")
-        else:
-            table = [{"Status": k, "Count": v} for k, v in res.items()]
-            st.dataframe(table)
+        st.dataframe(
+            [{"Status":k,"Count":v} for k,v in res.items()]
+            if res else [{"Info":"No data"}]
+        )
 
     elif action == "Total":
         total = 0
+
         for a in att_list:
             eid = a["employee_id"]
             emp = next(e for e in emp_list if e["employee_id"]==eid)
-            total += safe_float(a["actual_hours"]) * safe_float(emp["hourly_rate"])
+
+            hours = safe_float(a.get("actual_hours",0))
+            rate = safe_float(emp.get("hourly_rate",0))
+
+            total += hours * rate
 
         if total == 0:
             st.warning("⚠️ No data")
