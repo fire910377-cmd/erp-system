@@ -219,8 +219,14 @@ with tab3:
         status = "No-Show" if h==0 else ("Late" if h<8 else "Present")
 
         if st.button("Clock", key="att_clock"):
+            # 找 shift_id
+            shift_id = "-"
+            for s in shift_list:
+                if s["employee_id"] == eid and str(s["date"]) == date:
+                    shift_id = s["shift_id"]
+
             aid = f"A{len(att_list)+1:03d}"
-            db["att"].append_row([aid,"-",eid,date,h,status,""])
+            db["att"].append_row([aid,shift_id,eid,date,h,status,""])
             st.success("Recorded")
 
     elif action == "Edit Notes":
@@ -268,10 +274,11 @@ with tab4:
             if a["employee_id"]==eid and str(a["date"])==d:
                 emp = next(e for e in emp_list if e["employee_id"]==eid)
                 pay = safe_float(a["actual_hours"]) * safe_float(emp["hourly_rate"])
-                st.success(f"${pay}")
+                st.success(f"💵 ${pay}")
                 found = True
+
         if not found:
-            st.warning("⚠️ No record found")
+            st.warning("⚠️ No attendance record found")
 
     elif action == "Weekly":
         eid = fix_employee_id(st.selectbox("Employee", emp_ids))
@@ -279,12 +286,18 @@ with tab4:
         e = fix_date(st.text_input("End"))
 
         total = 0
+        found = False
+
         for a in att_list:
             if a["employee_id"]==eid and int(s)<=int(a["date"])<=int(e):
                 emp = next(e for e in emp_list if e["employee_id"]==eid)
                 total += safe_float(a["actual_hours"]) * safe_float(emp["hourly_rate"])
+                found = True
 
-        st.success(f"${total}")
+        if found:
+            st.success(f"💰 ${total}")
+        else:
+            st.warning("⚠️ No records in range")
 
     elif action == "Ranking":
         res = {}
@@ -294,15 +307,21 @@ with tab4:
             pay = safe_float(a["actual_hours"]) * safe_float(emp["hourly_rate"])
             res[eid] = res.get(eid,0)+pay
 
-        st.dataframe(sorted(res.items(), key=lambda x:x[1], reverse=True))
+        if not res:
+            st.warning("⚠️ No data")
+        else:
+            st.dataframe(sorted(res.items(), key=lambda x:x[1], reverse=True))
 
     elif action == "Stats":
         res = {}
         for a in att_list:
             res[a["status"]] = res.get(a["status"],0)+1
 
-        table = [{"Status": k, "Count": v} for k, v in res.items()]
-        st.dataframe(table)
+        if not res:
+            st.warning("⚠️ No data")
+        else:
+            table = [{"Status": k, "Count": v} for k, v in res.items()]
+            st.dataframe(table)
 
     elif action == "Total":
         total = 0
@@ -311,4 +330,7 @@ with tab4:
             emp = next(e for e in emp_list if e["employee_id"]==eid)
             total += safe_float(a["actual_hours"]) * safe_float(emp["hourly_rate"])
 
-        st.success(f"${total}")
+        if total == 0:
+            st.warning("⚠️ No data")
+        else:
+            st.success(f"💰 ${total}")
