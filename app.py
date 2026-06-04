@@ -1,22 +1,23 @@
 import streamlit as st
 import gspread
-import pandas as pd
-import re
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- 頁面設定 ---
-st.set_page_config(page_title="專業薪資排班系統", layout="wide")
-
-# --- 資料庫連接層 ---
 @st.cache_resource
 def get_sheets():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    # 請將你的 JSON key 內容存在 Streamlit Secrets 的 gcp_service_account
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
+    
+    # 確保這裡的 key 是 "gcp_service_account"
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+        dict(st.secrets["gcp_service_account"]), 
+        scope
+    )
+    
     client = gspread.authorize(creds)
+    # 使用你文件中的 Sheet ID
     sheet = client.open_by_key("1Y_BD6eCM_jt-FzwNjVrocPmRGr104pQcY1qoPPN2pnE")
     return sheet.worksheet('Employees'), sheet.worksheet('Shifts'), sheet.worksheet('Attendance')
 
+# 呼叫並啟動
 emp_ws, shift_ws, att_ws = get_sheets()
 
 # --- 側邊導航 ---
